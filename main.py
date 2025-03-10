@@ -95,7 +95,7 @@ def keep_alive():
             print(f"Keep Alive Status: {response.status_code}")
         except Exception as e:
             print(f"Keep Alive Error: {e}")
-        tm.sleep(300)  # Ping setiap 5 menit
+        tm.sleep(600)  # Ping setiap 10 menit
 
 # Menjalankan fungsi keep_alive di thread terpisah agar tidak mengganggu UI
 thread = threading.Thread(target=keep_alive, daemon=True)
