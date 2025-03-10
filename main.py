@@ -3,10 +3,14 @@ import requests
 import pandas as pd
 from datetime import datetime, time, timedelta, date
 import locale
+import threading
 import time as tm 
 
 # URL dari Google Apps Script Web App
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywSRCwDhF6BoV7-za6sRy3zq_WI5vNYJqo4t4wGyxgkEW8_B5vHDnQ3Nw3tVhjteYm/exec"
+
+# Atur locale ke bahasa Indonesia
+locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')
 
 # Function to get all data from Google Sheets
 def get_all_data():
@@ -80,6 +84,20 @@ def parse_time(time_str):
     else:
         return time(0, 0)
 
+# Fungsi Ping Otomatis (Keep Alive)
+def keep_alive():
+    while True:
+        try:
+            response = requests.get(APPS_SCRIPT_URL, timeout=10)
+            print(f"Keep Alive Status: {response.status_code}")
+        except Exception as e:
+            print(f"Keep Alive Error: {e}")
+        tm.sleep(300)  # Ping setiap 5 menit
+
+# Menjalankan fungsi keep_alive di thread terpisah agar tidak mengganggu UI
+thread = threading.Thread(target=keep_alive, daemon=True)
+thread.start()
+
 # Get options for select box
 options = get_options()
 
@@ -103,7 +121,7 @@ if isinstance(all_data, list) and all_data:
             st.write(f"🏷️ **Jenis Produk:** {row['Jenis Produk']}")
             st.write(f"🏭 **Line:** {row['Line']}")
             st.write(f"⏰ **Jam Start:** {row['Jam Start']}")
-            st.write(f"⏳ **Jam Stop:** {row['Jam Stop']}")
+            st.write(f"⏳ **Jam Stop :** {row['Jam Stop']}")
             st.write(f"⏱️ **Total hour:** {row['Total hour']}")
             st.write(f"🚀 **Speed (kg/jam):** {row['Speed (kg/jam)']}")
             st.write(f"📦 **Rencana Total Output (kg):** {row['Rencana Total Output (kg)']}")
@@ -113,15 +131,31 @@ if isinstance(all_data, list) and all_data:
             col1, col2 = st.columns(2)
             with col1:
                 if st.button(f"🗑️ Hapus {unique_key}", key=f"delete_{unique_key}"):
-                    delete_data(unique_key)
-                    st.toast(f"Data {unique_key} berhasil dihapus.", icon="✅")
-                    tm.sleep(2)
-                    st.rerun()  # Refresh UI after delete
+                    st.session_state.confirm_delete = unique_key  # Set unique_key for confirmation
 
             with col2:
                 if st.button(f"✏️ Edit {unique_key}", key=f"edit_{unique_key}"):
                     st.session_state["edit_data"] = row
                     st.session_state["editing"] = True
+
+# Konfirmasi penghapusan
+if "confirm_delete" in st.session_state and st.session_state.confirm_delete:
+    unique_key = st.session_state.confirm_delete
+    st.error("Apakah Anda yakin ingin menghapus data ini?")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Ya, Hapus"):
+            delete_data(unique_key)
+            st.success(f"Data {unique_key} berhasil dihapus.")
+            st.session_state.confirm_delete = None  # Reset konfirmasi
+            tm.sleep(2)
+            st.rerun()  # Refresh UI setelah penghapusan
+    with col2:
+        if st.button("Batal"):
+            st.session_state.confirm_delete = None  # Reset konfirmasi
+            st.toast("Penghapusan dibatalkan.",icon="↩️")
+            tm.sleep(2)
+            st.rerun()
 
 # If the user clicks "Edit", display the form for updating
 if st.session_state.get("editing", False):
@@ -151,8 +185,16 @@ if st.session_state.get("editing", False):
             "Tanggal": st.date_input("📅 Tanggal", value=tanggal_date),  # Use the converted date
             "Jenis Produk": st.selectbox("🏷️ Jenis Produk", list_produk),
         }
+        # Validation for "Jenis Produk"
+        if not updated_row["Jenis Produk"]:
+            st.error("⚠ Jenis Produk belum dipilih.")
+
     with col2:
         updated_row["Line"] = st.selectbox("🏭 Line", list_line)
+        # Validation for "Line"
+        if not updated_row["Line"]:
+            st.error("⚠ Line belum dipilih.")
+
         start_time = st.time_input("⏰ Waktu Mulai", value=parse_time(row["Jam Start"]))
         stop_time = st.time_input("⏳ Waktu Selesai", value=parse_time(row["Jam Stop"]))
 
@@ -206,7 +248,11 @@ if st.session_state.get("editing", False):
         "Inner (roll)": InnerRoll
     })
 
-    if st.button("💾 Simpan Perubahan"):
+    # Checkbox untuk konfirmasi update
+    confirm_update = st.checkbox("Saya yakin ingin memperbarui data.")
+
+    # Tombol update hanya aktif jika checkbox dicentang
+    if st.button("💾 Simpan Perubahan", disabled=not confirm_update):
         result = update_data(updated_row)
         if result.get("status") == "success":
             st.toast("Data berhasil diperbarui!", icon="✅")
@@ -215,3 +261,4 @@ if st.session_state.get("editing", False):
             st.rerun()
         else:
             st.error("Gagal memperbarui data. Silakan coba lagi.")
+
