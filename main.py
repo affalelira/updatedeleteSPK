@@ -170,7 +170,6 @@ if st.session_state.get("editing", False):
         try:
             tanggal_date = datetime.strptime(row["Tanggal"], "%A, %d %B %Y").date()
         except ValueError:
-            st.error(f"Format tanggal tidak valid: {row['Tanggal']}")
             tanggal_date = datetime.now().date()  # Fallback to today's date
     else:
         tanggal_date = row["Tanggal"]
