@@ -10,7 +10,10 @@ import time as tm
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywSRCwDhF6BoV7-za6sRy3zq_WI5vNYJqo4t4wGyxgkEW8_B5vHDnQ3Nw3tVhjteYm/exec"
 
 # Atur locale ke bahasa Indonesia
-locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')
+try:
+    locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')
+except locale.Error:
+    print("Locale 'id_ID.UTF-8' tidak tersedia, menggunakan locale default.")
 
 # Function to get all data from Google Sheets
 def get_all_data():
